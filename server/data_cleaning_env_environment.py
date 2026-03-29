@@ -1,6 +1,6 @@
 import pandas as pd
 from typing import Optional
-from .models import DataCleaningObservation,DataCleaningAction
+from .models import DataCleaningObservation, DataCleaningAction
 
 class DataCleaningEnvironment:
     def __init__(self, task_name: str = "remove_duplicates"):
@@ -8,7 +8,7 @@ class DataCleaningEnvironment:
         self.df = None
         self.done = False
 
-    def reset(self) ->DataCleaningObservation:
+    def reset(self) -> DataCleaningObservation:
         self.df = pd.DataFrame({
             "name": ["Alice","Bob","Alice","Charlie","Bob"],
             "age": [25, None, 25, 30, None],
@@ -19,7 +19,10 @@ class DataCleaningEnvironment:
         self.done = False
         return self._get_observation()
 
-    def step(self, action:DataCleaningAction ):
+    async def reset_async(self):
+        return self.reset()
+
+    def step(self, action: DataCleaningAction):
         reward = 0.0
         message = ""
 
@@ -32,9 +35,7 @@ class DataCleaningEnvironment:
 
         elif action.action_type == "fill_missing":
             before = self.df.isnull().sum().sum()
-            self.df = self.df.fillna(
-                self.df.mean(numeric_only=True)
-            )
+            self.df = self.df.fillna(self.df.mean(numeric_only=True))
             after = self.df.isnull().sum().sum()
             filled = before - after
             reward = min(filled / before, 1.0) if before > 0 else 0.0
@@ -61,6 +62,9 @@ class DataCleaningEnvironment:
             "info": {"message": message}
         }
 
+    async def step_async(self, action: DataCleaningAction):
+        return self.step(action)
+
     def state(self):
         return {
             "rows": len(self.df),
@@ -68,6 +72,12 @@ class DataCleaningEnvironment:
             "missing": int(self.df.isnull().sum().sum()),
             "task": self.task_name
         }
+
+    def close(self):
+        pass
+
+    def seed(self, seed=None):
+        pass
 
     def _get_observation(self) -> DataCleaningObservation:
         return DataCleaningObservation(
