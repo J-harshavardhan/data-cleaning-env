@@ -76,6 +76,7 @@ def main(host: str = "0.0.0.0", port: int = 8000):
 
 
 if __name__ == "__main__":
+    main()
     import argparse
 
     parser = argparse.ArgumentParser()
