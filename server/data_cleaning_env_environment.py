@@ -1,4 +1,4 @@
-mport pandas as pd
+import pandas as pd
 from typing import Optional
 from .models import DataCleaningObservation, DataCleaningAction
 
