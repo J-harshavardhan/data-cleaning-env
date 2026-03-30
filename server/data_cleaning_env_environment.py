@@ -1,12 +1,13 @@
-import pandas as pd
+mport pandas as pd
 from typing import Optional
 from .models import DataCleaningObservation, DataCleaningAction
 
 class DataCleaningEnvironment:
-    def __init__(self, task_name: str = "remove_duplicates"):
+    def _init_(self, task_name: str = "remove_duplicates"):
         self.task_name = task_name
         self.df = None
         self.done = False
+        self.expected_outliers = 1  # score=999 is the outlier
 
     def reset(self) -> DataCleaningObservation:
         self.df = pd.DataFrame({
@@ -30,29 +31,66 @@ class DataCleaningEnvironment:
             before = len(self.df)
             self.df = self.df.drop_duplicates()
             removed = before - len(self.df)
+            # Partial: 0.5 per duplicate removed, max 1.0
             reward = min(removed / 2, 1.0)
             message = f"Removed {removed} duplicates"
 
         elif action.action_type == "fill_missing":
             before = self.df.isnull().sum().sum()
-            self.df = self.df.fillna(self.df.mean(numeric_only=True))
-            after = self.df.isnull().sum().sum()
-            filled = before - after
-            reward = min(filled / before, 1.0) if before > 0 else 0.0
-            message = f"Filled {filled} missing values"
+            if before == 0:
+                reward = 0.0
+                message = "No missing values to fill"
+            else:
+                # Partial credit based on strategy quality
+                col_strategies = {}
+                for col in self.df.select_dtypes(include="number").columns:
+                    missing = self.df[col].isnull().sum()
+                    if missing > 0:
+                        # Use median for skewed, mean for normal
+                        skewness = abs(self.df[col].skew())
+                        if skewness > 1:
+                            self.df[col] = self.df[col].fillna(
+                                self.df[col].median()
+                            )
+                            col_strategies[col] = "median"
+                        else:
+                            self.df[col] = self.df[col].fillna(
+                                self.df[col].mean()
+                            )
+                            col_strategies[col] = "mean"
+                after = self.df.isnull().sum().sum()
+                filled = before - after
+                # Partial: proportion filled + bonus for smart strategy
+                fill_ratio = filled / before
+                strategy_bonus = 0.2 if len(col_strategies) > 0 else 0.0
+                reward = min(fill_ratio + strategy_bonus, 1.0)
+                message = f"Filled {filled} missing values using {col_strategies}"
 
         elif action.action_type == "fix_outliers":
             q1 = self.df["score"].quantile(0.25)
             q3 = self.df["score"].quantile(0.75)
             iqr = q3 - q1
-            outliers = ((self.df["score"] < q1 - 1.5*iqr) |
-                       (self.df["score"] > q3 + 1.5*iqr)).sum()
-            self.df["score"] = self.df["score"].clip(
-                lower=q1 - 1.5*iqr,
-                upper=q3 + 1.5*iqr
+            lower = q1 - 1.5 * iqr
+            upper = q3 + 1.5 * iqr
+            outlier_mask = (
+                (self.df["score"] < lower) | 
+                (self.df["score"] > upper)
             )
-            reward = 1.0 if outliers > 0 else 0.0
-            message = f"Fixed {outliers} outliers"
+            outliers_found = outlier_mask.sum()
+            
+            if outliers_found == 0:
+                reward = 0.0
+                message = "No outliers found"
+            else:
+                self.df["score"] = self.df["score"].clip(
+                    lower=lower, upper=upper
+                )
+                # Partial: how many outliers fixed vs expected
+                reward = min(outliers_found / self.expected_outliers, 1.0)
+                # Bonus if all outliers fixed cleanly
+                if outliers_found >= self.expected_outliers:
+                    reward = 1.0
+                message = f"Fixed {outliers_found} outliers (clipped to [{lower:.1f}, {upper:.1f}])"
 
         self.done = self._check_done()
         return {
@@ -90,9 +128,9 @@ class DataCleaningEnvironment:
 
     def _get_task_description(self) -> str:
         tasks = {
-            "remove_duplicates": "Remove all duplicate rows",
-            "fill_missing": "Fill all missing/null values",
-            "fix_outliers": "Fix outlier values in numeric columns"
+            "remove_duplicates": "Remove all duplicate rows from the dataset",
+            "fill_missing": "Fill all missing/null values using appropriate strategies (mean/median per column)",
+            "fix_outliers": "Detect and fix outlier values in numeric columns using IQR method"
         }
         return tasks.get(self.task_name, "Clean the dataset")
 
@@ -102,5 +140,12 @@ class DataCleaningEnvironment:
         elif self.task_name == "fill_missing":
             return self.df.isnull().sum().sum() == 0
         elif self.task_name == "fix_outliers":
-            return True
+            q1 = self.df["score"].quantile(0.25)
+            q3 = self.df["score"].quantile(0.75)
+            iqr = q3 - q1
+            outliers = (
+                (self.df["score"] < q1 - 1.5 * iqr) |
+                (self.df["score"] > q3 + 1.5 * iqr)
+            ).sum()
+            return outliers == 0  # ✅ proper done check
         return False
