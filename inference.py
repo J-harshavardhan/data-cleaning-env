@@ -1,41 +1,60 @@
 import os
+import json
 import requests
-from openai import OpenAI
 
-API_BASE_URL = os.environ.get("API_BASE_URL", "https://api.openai.com/v1")
-MODEL_NAME = os.environ.get("MODEL_NAME", "gpt-4o-mini")
+API_BASE_URL = os.environ.get("API_BASE_URL", "https://harshavardhanJ-data-cleaning-env.hf.space")
+MODEL_NAME = os.environ.get("MODEL_NAME", "gpt-4")
 HF_TOKEN = os.environ.get("HF_TOKEN", "")
 
-client = OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL)
-TASKS = ["remove_duplicates", "fill_missing", "fix_outliers"]
-BASE = "https://HarshavardhanJ-data-cleaning-env.hf.space"
-
 def run_task(task_name):
-    obs = requests.post(f"{BASE}/reset",
-          json={"task_name": task_name}).json()
-    total_reward = 0.0
-    for step in range(10):
-        response = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[
-                {"role": "system", "content":
-                 "Reply with ONLY one of: remove_duplicates, fill_missing, fix_outliers"},
-                {"role": "user", "content": str(obs)}
-            ],
-            max_tokens=20
+    try:
+        # Reset environment
+        reset_resp = requests.post(
+            f"{API_BASE_URL}/reset",
+            json={"task_name": task_name},
+            timeout=30
         )
-        action = response.choices[0].message.content.strip()
-        result = requests.post(f"{BASE}/step",
-                 json={"action_type": action}).json()
-        total_reward += result.get("reward", 0)
-        obs = result.get("observation", obs)
-        print(f"  Step {step+1}: {action} → {result.get('reward',0):.2f}")
-        if result.get("done"):
-            break
-    return total_reward
+        print(f"[START] task={task_name}")
+        
+        # Check response is valid JSON
+        try:
+            obs = reset_resp.json()
+        except json.JSONDecodeError:
+            print(f"Reset response not JSON: {reset_resp.text}")
+            return 0.0
+
+        # Step through the task
+        action_map = {
+            "remove_duplicates": "remove_duplicates",
+            "fill_missing": "fill_missing", 
+            "fix_outliers": "fix_outliers"
+        }
+        
+        action = action_map.get(task_name, "remove_duplicates")
+        step_resp = requests.post(
+            f"{API_BASE_URL}/step",
+            json={"action_type": action},
+            timeout=30
+        )
+        
+        try:
+            result = step_resp.json()
+        except json.JSONDecodeError:
+            print(f"Step response not JSON: {step_resp.text}")
+            return 0.0
+
+        reward = result.get("reward", 0.0)
+        print(f"[STEP] action={action} reward={reward}")
+        print(f"[END] task={task_name} final_reward={reward}")
+        return reward
+
+    except Exception as e:
+        print(f"[END] task={task_name} error={e} final_reward=0.0")
+        return 0.0
 
 if __name__ == "__main__":
-    print("=== Data Cleaning Baseline ===\n")
-    for task in TASKS:
-        print(f"\nTask: {task}")
-        print(f"Score: {run_task(task):.2f}")
+    tasks = ["remove_duplicates", "fill_missing", "fix_outliers"]
+    scores = {}
+    for task in tasks:
+        scores[task] = run_task(task)
+    print(f"\nFinal scores: {scores}")
