@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 class DataCleaningObservation(BaseModel):
@@ -7,9 +7,9 @@ class DataCleaningObservation(BaseModel):
     duplicate_rows: int
     missing_values: int
     task_description: str
-    reward: float = 0.0        # ADD THIS
-    done: bool = False         # ADD THIS
-    info: dict = {}            # ADD THIS
+    reward: float = 0.01
+    done: bool = False
+    info: dict = {}
 
 class DataCleaningAction(BaseModel):
     action_type: str
@@ -17,5 +17,5 @@ class DataCleaningAction(BaseModel):
     fill_value: Optional[str] = None
 
 class DataCleaningReward(BaseModel):
-    score: float
-    message: str
+    score: float = Field(default=0.5, gt=0.0, lt=1.0)
+    message: str = ""
