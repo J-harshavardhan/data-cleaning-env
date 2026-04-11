@@ -8,6 +8,7 @@ class DataCleaningEnvironment:
         self.df = None
         self.done = False
         self.expected_outliers = 1
+
     def reset(self) -> DataCleaningObservation:
         self.df = pd.DataFrame({
             "name": ["Alice","Bob","Alice","Charlie","Bob"],
@@ -30,9 +31,11 @@ class DataCleaningEnvironment:
             before = len(self.df)
             self.df = self.df.drop_duplicates()
             removed = before - len(self.df)
-            # Partial: 0.5 per duplicate removed, max 1.0
-            reward = min(removed / 2, 0.99)
-            reward = max(reward, 0.01) if removed > 0 else 0.01
+            if removed > 0:
+                reward = round(min(removed / 2.0, 0.99), 4)
+                reward = max(reward, 0.01)
+            else:
+                reward = 0.01
             message = f"Removed {removed} duplicates"
 
         elif action.action_type == "fill_missing":
@@ -41,12 +44,10 @@ class DataCleaningEnvironment:
                 reward = 0.01
                 message = "No missing values to fill"
             else:
-                # Partial credit based on strategy quality
                 col_strategies = {}
                 for col in self.df.select_dtypes(include="number").columns:
                     missing = self.df[col].isnull().sum()
                     if missing > 0:
-                        # Use median for skewed, mean for normal
                         skewness = abs(self.df[col].skew())
                         if skewness > 1:
                             self.df[col] = self.df[col].fillna(
@@ -60,10 +61,9 @@ class DataCleaningEnvironment:
                             col_strategies[col] = "mean"
                 after = self.df.isnull().sum().sum()
                 filled = before - after
-                # Partial: proportion filled + bonus for smart strategy
                 fill_ratio = filled / before
-                strategy_bonus = 0.2 if len(col_strategies) > 0 else 0.0
-                reward = min(fill_ratio + strategy_bonus, 0.99)
+                strategy_bonus = 0.15 if len(col_strategies) > 0 else 0.0
+                reward = round(min(fill_ratio + strategy_bonus, 0.99), 4)
                 reward = max(reward, 0.01)
                 message = f"Filled {filled} missing values using {col_strategies}"
 
@@ -74,11 +74,10 @@ class DataCleaningEnvironment:
             lower = q1 - 1.5 * iqr
             upper = q3 + 1.5 * iqr
             outlier_mask = (
-                (self.df["score"] < lower) | 
+                (self.df["score"] < lower) |
                 (self.df["score"] > upper)
             )
-            outliers_found = outlier_mask.sum()
-            
+            outliers_found = int(outlier_mask.sum())
             if outliers_found == 0:
                 reward = 0.01
                 message = "No outliers found"
@@ -86,11 +85,8 @@ class DataCleaningEnvironment:
                 self.df["score"] = self.df["score"].clip(
                     lower=lower, upper=upper
                 )
-                # Partial: how many outliers fixed vs expected
-                reward = min(outliers_found / self.expected_outliers, 0.99)
-                # Bonus if all outliers fixed cleanly
-                if outliers_found >= self.expected_outliers:
-                    reward = 0.99
+                reward = round(min(outliers_found / (self.expected_outliers + 0.01), 0.99), 4)
+                reward = max(reward, 0.01)
                 message = f"Fixed {outliers_found} outliers (clipped to [{lower:.1f}, {upper:.1f}])"
 
         self.done = self._check_done()
@@ -137,9 +133,9 @@ class DataCleaningEnvironment:
 
     def _check_done(self) -> bool:
         if self.task_name == "remove_duplicates":
-            return self.df.duplicated().sum() == 0
+            return bool(self.df.duplicated().sum() == 0)
         elif self.task_name == "fill_missing":
-            return self.df.isnull().sum().sum() == 0
+            return bool(self.df.isnull().sum().sum() == 0)
         elif self.task_name == "fix_outliers":
             q1 = self.df["score"].quantile(0.25)
             q3 = self.df["score"].quantile(0.75)
@@ -148,5 +144,5 @@ class DataCleaningEnvironment:
                 (self.df["score"] < q1 - 1.5 * iqr) |
                 (self.df["score"] > q3 + 1.5 * iqr)
             ).sum()
-            return outliers == 0  # ✅ proper done check
+            return bool(outliers == 0)
         return False
