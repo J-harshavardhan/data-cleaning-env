@@ -100,6 +100,38 @@ class DataCleaningEnvironment:
     async def step_async(self, action: DataCleaningAction):
         return self.step(action)
 
+    def grade(self, task_name: str = None) -> float:
+        """Grader function called by OpenEnv validator"""
+        task = task_name or self.task_name
+        if self.df is None:
+            return 0.5
+
+        if task == "remove_duplicates":
+            dups = self.df.duplicated().sum()
+            total = len(self.df)
+            score = 1.0 - (dups / total)
+            return round(max(0.01, min(score, 0.99)), 4)
+
+        elif task == "fill_missing":
+            missing = self.df.isnull().sum().sum()
+            total_cells = self.df.size
+            score = 1.0 - (missing / total_cells)
+            return round(max(0.01, min(score, 0.99)), 4)
+
+        elif task == "fix_outliers":
+            q1 = self.df["score"].quantile(0.25)
+            q3 = self.df["score"].quantile(0.75)
+            iqr = q3 - q1
+            outliers = (
+                (self.df["score"] < q1 - 1.5 * iqr) |
+                (self.df["score"] > q3 + 1.5 * iqr)
+            ).sum()
+            total = len(self.df)
+            score = 1.0 - (outliers / total)
+            return round(max(0.01, min(score, 0.99)), 4)
+
+        return 0.5
+
     def state(self):
         return {
             "rows": len(self.df),
