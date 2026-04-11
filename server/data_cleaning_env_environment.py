@@ -23,7 +23,7 @@ class DataCleaningEnvironment:
         return self.reset()
 
     def step(self, action: DataCleaningAction):
-        reward = 0.0
+        reward = 0.01
         message = ""
 
         if action.action_type == "remove_duplicates":
@@ -31,13 +31,14 @@ class DataCleaningEnvironment:
             self.df = self.df.drop_duplicates()
             removed = before - len(self.df)
             # Partial: 0.5 per duplicate removed, max 1.0
-            reward = min(removed / 2, 1.0)
+            reward = min(removed / 2, 0.99)
+            reward = max(reward, 0.01) if removed > 0 else 0.01
             message = f"Removed {removed} duplicates"
 
         elif action.action_type == "fill_missing":
             before = self.df.isnull().sum().sum()
             if before == 0:
-                reward = 0.0
+                reward = 0.01
                 message = "No missing values to fill"
             else:
                 # Partial credit based on strategy quality
@@ -62,7 +63,8 @@ class DataCleaningEnvironment:
                 # Partial: proportion filled + bonus for smart strategy
                 fill_ratio = filled / before
                 strategy_bonus = 0.2 if len(col_strategies) > 0 else 0.0
-                reward = min(fill_ratio + strategy_bonus, 1.0)
+                reward = min(fill_ratio + strategy_bonus, 0.99)
+                reward = max(reward, 0.01)
                 message = f"Filled {filled} missing values using {col_strategies}"
 
         elif action.action_type == "fix_outliers":
@@ -78,17 +80,17 @@ class DataCleaningEnvironment:
             outliers_found = outlier_mask.sum()
             
             if outliers_found == 0:
-                reward = 0.0
+                reward = 0.01
                 message = "No outliers found"
             else:
                 self.df["score"] = self.df["score"].clip(
                     lower=lower, upper=upper
                 )
                 # Partial: how many outliers fixed vs expected
-                reward = min(outliers_found / self.expected_outliers, 1.0)
+                reward = min(outliers_found / self.expected_outliers, 0.99)
                 # Bonus if all outliers fixed cleanly
                 if outliers_found >= self.expected_outliers:
-                    reward = 1.0
+                    reward = 0.99
                 message = f"Fixed {outliers_found} outliers (clipped to [{lower:.1f}, {upper:.1f}])"
 
         self.done = self._check_done()
