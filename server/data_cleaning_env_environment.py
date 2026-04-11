@@ -3,11 +3,11 @@ from typing import Optional
 from .models import DataCleaningObservation, DataCleaningAction
 
 class DataCleaningEnvironment:
-    def __init__(self, task_name: str = "remove_duplicates"):  # ✅ double underscores        self.task_name = task_name
+    def __init__(self, task_name: str = "remove_duplicates"):
+        self.task_name = task_name
         self.df = None
         self.done = False
-        self.expected_outliers = 1  # score=999 is the outlier
-
+        self.expected_outliers = 1
     def reset(self) -> DataCleaningObservation:
         self.df = pd.DataFrame({
             "name": ["Alice","Bob","Alice","Charlie","Bob"],
