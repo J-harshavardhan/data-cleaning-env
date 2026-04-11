@@ -32,7 +32,7 @@ class DataCleaningEnvironment:
             self.df = self.df.drop_duplicates()
             removed = before - len(self.df)
             if removed > 0:
-                reward = round(min(removed / 2.0, 0.99), 4)
+                reward = round(min(removed / 3.0, 0.95), 4)
                 reward = max(reward, 0.01)
             else:
                 reward = 0.01
@@ -62,8 +62,8 @@ class DataCleaningEnvironment:
                 after = self.df.isnull().sum().sum()
                 filled = before - after
                 fill_ratio = filled / before
-                strategy_bonus = 0.15 if len(col_strategies) > 0 else 0.0
-                reward = round(min(fill_ratio + strategy_bonus, 0.99), 4)
+                strategy_bonus = 0.10
+                reward = round(min(fill_ratio * 0.85 + strategy_bonus, 0.95), 4)
                 reward = max(reward, 0.01)
                 message = f"Filled {filled} missing values using {col_strategies}"
 
@@ -85,7 +85,7 @@ class DataCleaningEnvironment:
                 self.df["score"] = self.df["score"].clip(
                     lower=lower, upper=upper
                 )
-                reward = round(min(outliers_found / (self.expected_outliers + 0.01), 0.99), 4)
+                reward = round(min(outliers_found / 3.0, 0.95), 4)
                 reward = max(reward, 0.01)
                 message = f"Fixed {outliers_found} outliers (clipped to [{lower:.1f}, {upper:.1f}])"
 

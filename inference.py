@@ -55,8 +55,7 @@ def run_task(task_name):
             return 0.01
 
         reward = result.get("reward", 0.01)
-        # Ensure strictly between 0 and 1
-        reward = max(0.01, min(float(reward), 0.99))
+        reward = max(0.01, min(float(reward), 0.95))
 
         print(f"[STEP] task={task_name} action={action} reward={reward}")
         print(f"[END] task={task_name} final_reward={reward}")
