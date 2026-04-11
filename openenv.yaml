@@ -3,38 +3,32 @@ name: data_cleaning_env
 description: "A real-world data cleaning environment where AI agents learn to clean messy tabular datasets through duplicate removal, missing value imputation, and outlier detection."
 author: "Jagannati Harshavardhan"
 version: "1.0.0"
-
 tasks:
   - name: remove_duplicates
     difficulty: easy
     description: "Remove all duplicate rows from the dataset"
     max_steps: 5
-    reward_range: [0.0, 1.0]
-
+    reward_range: [0.01, 0.99]
   - name: fill_missing
     difficulty: medium
     description: "Fill all missing/null values using appropriate strategies per column"
     max_steps: 10
-    reward_range: [0.0, 1.0]
-
+    reward_range: [0.01, 0.99]
   - name: fix_outliers
     difficulty: hard
     description: "Detect and fix outlier values in numeric columns using IQR method"
     max_steps: 10
-    reward_range: [0.0, 1.0]
-
+    reward_range: [0.01, 0.99]
 type: space
 runtime: fastapi
 app: server.app:app
 port: 8000
-
 observation_space:
   dataset_preview: string
   total_rows: integer
   duplicate_rows: integer
   missing_values: integer
   task_description: string
-
 action_space:
   action_type:
     - remove_duplicates
