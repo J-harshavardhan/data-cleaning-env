@@ -1,6 +1,7 @@
 spec_version: 1
 name: data_cleaning_env
 description: "A real-world data cleaning environment where AI agents learn to clean messy tabular datasets through duplicate removal, missing value imputation, and outlier detection."
+readme: README.md
 author: "Jagannati Harshavardhan"
 version: "1.0.0"
 tasks:
