@@ -8,7 +8,7 @@ MODEL_NAME = os.environ.get("MODEL_NAME", "gpt-4")
 HF_TOKEN = os.environ.get("HF_TOKEN")
 
 client = OpenAI(
-    base_url=os.environ["API_BASE_URL"],
+    base_url=API_BASE_URL,
     api_key=os.environ.get("API_KEY", "dummy")
 )
 
@@ -28,7 +28,6 @@ def get_action_from_llm(task_name, observation):
 
 def run_task(task_name):
     try:
-        # Reset
         reset_resp = requests.post(
             f"{API_BASE_URL}/reset",
             json={"task_name": task_name},
@@ -41,10 +40,8 @@ def run_task(task_name):
             return 0.01
 
         print(f"[START] task={task_name} obs={json.dumps(obs)}")
-
         action = get_action_from_llm(task_name, str(obs))
 
-        # ✅ Wrap action in "action" key
         step_resp = requests.post(
             f"{API_BASE_URL}/step",
             json={"action": {"action_type": task_name}},
@@ -58,7 +55,6 @@ def run_task(task_name):
 
         reward = result.get("reward", 0.01)
         reward = max(0.01, min(float(reward), 0.95))
-
         print(f"[STEP] task={task_name} action={action} reward={reward}")
         print(f"[END] task={task_name} final_reward={reward}")
         return reward
