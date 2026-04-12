@@ -24,6 +24,10 @@ class DataCleaningEnvironment:
         return self.reset()
 
     def step(self, action: DataCleaningAction):
+            # Auto-reset if df is None
+        if self.df is None:
+            self.reset()
+            
         reward = 0.01
         message = ""
 
@@ -178,3 +182,4 @@ class DataCleaningEnvironment:
             ).sum()
             return bool(outliers == 0)
         return False
+    
