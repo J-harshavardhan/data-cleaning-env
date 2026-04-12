@@ -27,7 +27,7 @@ class DataCleaningEnvironment:
             self.task_name = task_name
         return self.reset()
 
-    def step(self, action: DataCleaningAction):
+    def step(self, action: DataCleaningAction) -> DataCleaningObservation:
         if self.df is None:
             self.reset()
 
@@ -97,12 +97,13 @@ class DataCleaningEnvironment:
                 message = f"Fixed {outliers_found} outliers (clipped to [{lower:.1f}, {upper:.1f}])"
 
         self.done = self._check_done()
-        return {
-            "observation": self._get_observation(),
-            "reward": reward,
-            "done": self.done,
-            "info": {"message": message}
-        }
+
+        # ✅ Return Pydantic model not dict
+        obs = self._get_observation()
+        obs.reward = reward
+        obs.done = self.done
+        obs.info = {"message": message}
+        return obs
 
     async def step_async(self, action: DataCleaningAction):
         if self.df is None:
