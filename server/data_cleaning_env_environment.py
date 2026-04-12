@@ -27,16 +27,13 @@ class DataCleaningEnvironment:
                           episode_id: str = None,
                           seed: int = None,
                           **kwargs):
-        # Try every possible way the framework might pass task name
         task = None
         if task_name and task_name in ["remove_duplicates", "fill_missing", "fix_outliers"]:
             task = task_name
         elif episode_id and episode_id in ["remove_duplicates", "fill_missing", "fix_outliers"]:
             task = episode_id
-        
         if task:
             self.task_name = task
-        
         return self.reset()
 
     def step(self, action: DataCleaningAction) -> DataCleaningObservation:
@@ -108,12 +105,11 @@ class DataCleaningEnvironment:
                 reward = max(0.01, min(reward, 0.95))
                 message = f"Fixed {outliers_found} outliers (clipped to [{lower:.1f}, {upper:.1f}])"
 
-        self.done = self._check_done()
+        self.done = False  # Never set done=True
 
-        # Return Pydantic model
         obs = self._get_observation()
         obs.reward = reward
-        obs.done = self.done
+        obs.done = False  # Always False
         obs.info = {"message": message}
         return obs
 
@@ -187,17 +183,4 @@ class DataCleaningEnvironment:
         return tasks.get(self.task_name, "Clean the dataset")
 
     def _check_done(self) -> bool:
-        if self.task_name == "remove_duplicates":
-            return bool(self.df.duplicated().sum() == 0)
-        elif self.task_name == "fill_missing":
-            return bool(self.df.isnull().sum().sum() == 0)
-        elif self.task_name == "fix_outliers":
-            q1 = self.df["score"].quantile(0.25)
-            q3 = self.df["score"].quantile(0.75)
-            iqr = q3 - q1
-            outliers = (
-                (self.df["score"] < q1 - 1.5 * iqr) |
-                (self.df["score"] > q3 + 1.5 * iqr)
-            ).sum()
-            return bool(outliers == 0)
-        return False
+        return False  # Never return done=True
