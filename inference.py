@@ -28,6 +28,7 @@ def get_action_from_llm(task_name, observation):
 
 def run_task(task_name):
     try:
+        # Reset
         reset_resp = requests.post(
             f"{API_BASE_URL}/reset",
             json={"task_name": task_name},
@@ -43,9 +44,10 @@ def run_task(task_name):
 
         action = get_action_from_llm(task_name, str(obs))
 
+        # ✅ Wrap action in "action" key
         step_resp = requests.post(
             f"{API_BASE_URL}/step",
-            json={"action_type": task_name},
+            json={"action": {"action_type": task_name}},
             timeout=30
         )
         try:

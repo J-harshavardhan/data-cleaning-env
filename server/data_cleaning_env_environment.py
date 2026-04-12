@@ -9,7 +9,9 @@ class DataCleaningEnvironment:
         self.done = False
         self.expected_outliers = 1
 
-    def reset(self) -> DataCleaningObservation:
+    def reset(self, task_name: str = None) -> DataCleaningObservation:
+        if task_name:
+            self.task_name = task_name
         self.df = pd.DataFrame({
             "name": ["Alice","Bob","Alice","Charlie","Bob"],
             "age": [25, None, 25, 30, None],
@@ -20,12 +22,14 @@ class DataCleaningEnvironment:
         self.done = False
         return self._get_observation()
 
-    async def reset_async(self):
+    async def reset_async(self, task_name: str = None, **kwargs):
+        if task_name:
+            self.task_name = task_name
         return self.reset()
 
     def step(self, action: DataCleaningAction):
         if self.df is None:
-           self.reset()
+            self.reset()
 
         reward = 0.01
         message = ""
@@ -101,13 +105,14 @@ class DataCleaningEnvironment:
         }
 
     async def step_async(self, action: DataCleaningAction):
+        if self.df is None:
+            self.reset()
         return self.step(action)
 
     def grade(self, task_name: str = None) -> float:
-        """Grader function called by OpenEnv validator"""
         task = task_name or self.task_name
         if self.df is None:
-            return 0.5
+            self.reset()
 
         if task == "remove_duplicates":
             dups = self.df.duplicated().sum()
@@ -136,6 +141,8 @@ class DataCleaningEnvironment:
         return 0.5
 
     def state(self):
+        if self.df is None:
+            self.reset()
         return {
             "rows": len(self.df),
             "duplicates": int(self.df.duplicated().sum()),
@@ -181,4 +188,3 @@ class DataCleaningEnvironment:
             ).sum()
             return bool(outliers == 0)
         return False
-    
