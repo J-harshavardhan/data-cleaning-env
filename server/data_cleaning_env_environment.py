@@ -10,21 +10,33 @@ class DataCleaningEnvironment:
         self.expected_outliers = 1
 
     def reset(self, task_name: str = None) -> DataCleaningObservation:
-        if task_name:
+        if task_name and task_name in ["remove_duplicates", "fill_missing", "fix_outliers"]:
             self.task_name = task_name
         self.df = pd.DataFrame({
-            "name": ["Alice","Bob","Alice","Charlie","Bob"],
+            "name": ["Alice", "Bob", "Alice", "Charlie", "Bob"],
             "age": [25, None, 25, 30, None],
-            "date": ["2024-01-01","01/02/2024","2024-01-01",
-                     "2024-03-01","01/02/2024"],
+            "date": ["2024-01-01", "01/02/2024", "2024-01-01",
+                     "2024-03-01", "01/02/2024"],
             "score": [100, 200, 100, 999, 200]
         })
         self.done = False
         return self._get_observation()
 
-    async def reset_async(self, task_name: str = None, **kwargs):
-        if task_name:
-            self.task_name = task_name
+    async def reset_async(self,
+                          task_name: str = None,
+                          episode_id: str = None,
+                          seed: int = None,
+                          **kwargs):
+        # Try every possible way the framework might pass task name
+        task = None
+        if task_name and task_name in ["remove_duplicates", "fill_missing", "fix_outliers"]:
+            task = task_name
+        elif episode_id and episode_id in ["remove_duplicates", "fill_missing", "fix_outliers"]:
+            task = episode_id
+        
+        if task:
+            self.task_name = task
+        
         return self.reset()
 
     def step(self, action: DataCleaningAction) -> DataCleaningObservation:
@@ -40,7 +52,7 @@ class DataCleaningEnvironment:
             removed = before - len(self.df)
             if removed > 0:
                 reward = round(min(removed / 3.0, 0.95), 4)
-                reward = max(reward, 0.01)
+                reward = max(0.01, min(reward, 0.95))
             else:
                 reward = 0.01
             message = f"Removed {removed} duplicates"
@@ -71,7 +83,7 @@ class DataCleaningEnvironment:
                 fill_ratio = filled / before
                 strategy_bonus = 0.10
                 reward = round(min(fill_ratio * 0.85 + strategy_bonus, 0.95), 4)
-                reward = max(reward, 0.01)
+                reward = max(0.01, min(reward, 0.95))
                 message = f"Filled {filled} missing values using {col_strategies}"
 
         elif action.action_type == "fix_outliers":
@@ -93,12 +105,12 @@ class DataCleaningEnvironment:
                     lower=lower, upper=upper
                 )
                 reward = round(min(outliers_found / 3.0, 0.95), 4)
-                reward = max(reward, 0.01)
+                reward = max(0.01, min(reward, 0.95))
                 message = f"Fixed {outliers_found} outliers (clipped to [{lower:.1f}, {upper:.1f}])"
 
         self.done = self._check_done()
 
-        # ✅ Return Pydantic model not dict
+        # Return Pydantic model
         obs = self._get_observation()
         obs.reward = reward
         obs.done = self.done
@@ -119,13 +131,13 @@ class DataCleaningEnvironment:
             dups = self.df.duplicated().sum()
             total = len(self.df)
             score = 1.0 - (dups / total)
-            return round(max(0.01, min(score, 0.99)), 4)
+            return round(max(0.01, min(score, 0.95)), 4)
 
         elif task == "fill_missing":
             missing = self.df.isnull().sum().sum()
             total_cells = self.df.size
             score = 1.0 - (missing / total_cells)
-            return round(max(0.01, min(score, 0.99)), 4)
+            return round(max(0.01, min(score, 0.95)), 4)
 
         elif task == "fix_outliers":
             q1 = self.df["score"].quantile(0.25)
@@ -137,7 +149,7 @@ class DataCleaningEnvironment:
             ).sum()
             total = len(self.df)
             score = 1.0 - (outliers / total)
-            return round(max(0.01, min(score, 0.99)), 4)
+            return round(max(0.01, min(score, 0.95)), 4)
 
         return 0.5
 
